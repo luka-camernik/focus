@@ -110,13 +110,16 @@ func main() {
 		}
 		if len(configuration.AvailableWindows) > 0 {
 			if cycle {
+				// If we don't reverse them we only ever get max 2 windows 1 focused and 1 last opened
+				// which resets because we just cycled
+				configuration.AvailableWindows = reverse(configuration.AvailableWindows)
 				found := false
 				for _, wid := range configuration.AvailableWindows {
 					if wid != configuration.CurrentWindowId {
 						found = true
 						log.Println("[Main] Found another window of the program!", configuration.CurrentWindowId)
 						focus(wid)
-						continue
+						break
 					}
 				}
 				if !found {
