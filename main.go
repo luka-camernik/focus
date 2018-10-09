@@ -54,6 +54,20 @@ func init() {
 	log.SetFormatter(customFormatter)
 }
 
+func checkDependencies() bool {
+	err := exec.Command("xprop", "-root").Run()
+	if err != nil {
+		log.Println("Missing xprop dependency")
+		return false
+	}
+	err = exec.Command("xdotool", "help").Run()
+	if err != nil {
+		log.Println("Missing xdotool dependency")
+		return false
+	}
+	return true
+}
+
 func checkRequiredParams() bool {
 	if printHelp || printVer || configuration.Program == "" {
 		printUsage()
@@ -68,10 +82,12 @@ func printUsage() {
 	fmt.Println("-----------------------------")
 	flag.PrintDefaults()
 	fmt.Println("-----------------------------")
+	fmt.Println("Dependencies xdotool and xprop")
+	fmt.Println("-----------------------------")
 }
 
 func main() {
-	if !checkRequiredParams() {
+	if !checkDependencies() || !checkRequiredParams() {
 		os.Exit(0)
 	}
 	configuration.ProgramId = findCurrentProgramId()
