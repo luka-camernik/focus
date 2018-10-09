@@ -81,6 +81,10 @@ func main() {
 	configuration.StackedWindows = findStackingWindows()
 	if len(configuration.StackedWindows) > 0 {
 		configuration.AvailableWindows = processWindowIds(configuration.StackedWindows)
+		if len(configuration.AvailableWindows) == 0 {
+			// fallback to name parsing
+			configuration.AvailableWindows = processWindowIdsByName(configuration.StackedWindows)
+		}
 		cycle := false
 		for _, wid := range configuration.AvailableWindows {
 			if wid == configuration.CurrentWindowId {
@@ -132,9 +136,6 @@ func processWindowIds(ids []string) []string {
 		if programId == configuration.ProgramId {
 			availableWindows = append(availableWindows, windowId)
 		}
-	}
-	if len(availableWindows) == 0 {
-		availableWindows = processWindowIdsByName(ids) // back fall to name parsing
 	}
 	return availableWindows
 }
