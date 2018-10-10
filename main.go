@@ -238,7 +238,7 @@ func checkRequiredParams() bool {
 
 func printUsage() {
 	fmt.Println("-----------------------------")
-	fmt.Println("Focus v1.0.0")
+	fmt.Println("Focus v1.0.1")
 	fmt.Println("-----------------------------")
 	flag.PrintDefaults()
 	fmt.Println("-----------------------------")
