@@ -121,6 +121,12 @@ func attemptFocus(cycle bool) {
 }
 
 func processWindowIds(ids []string, round int) []string {
+	if len(ids) != len(configuration.WindowInformation) {
+		removeCache()
+		ids = xprop.Parse(configuration.StackedWindows)
+		configuration.WindowInformation = xprop.WindowInformation
+		setCache(xprop.WindowInformation)
+	}
 	if round > 2 {
 		removeCache()
 		fmt.Println("ERROR, there were too many rounds something went wrong!")
