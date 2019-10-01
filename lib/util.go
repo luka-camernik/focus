@@ -8,7 +8,7 @@ import (
 
 func Open(program string) {
 	fmt.Println(fmt.Sprintf("[open] Opening %s", program))
-	exec.Command("/bin/sh", "-c", program, "%> /dev/null").Start()
+	_ = exec.Command("/bin/sh", "-c", program, "%> /dev/null").Start()
 }
 
 func HandleError(err error, msg string) {

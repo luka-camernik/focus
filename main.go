@@ -25,6 +25,7 @@ type Configuration struct {
 	CurrentWindowId   string
 	ConfigFolder      string
 	cacheFile         string
+	OpenProgram       string
 }
 
 var configuration Configuration
@@ -41,18 +42,21 @@ func init() {
 		log.Fatal(err)
 	}
 	configuration.ConfigFolder = usr.HomeDir + "/.config/focus/"
-	os.Mkdir(configuration.ConfigFolder, 0700)
+	_ = os.Mkdir(configuration.ConfigFolder, 0700)
 	configuration.cacheFile = configuration.ConfigFolder + "simplecache.json"
 	var program string
 	var open bool
+	var openProgram string
 	flag.Usage = printUsage
 	flag.StringVar(&program, "p", "", "Which program to attempt to focus (Required)")
 	flag.BoolVar(&open, "o", false, "Try to open the program if it cannot be found")
+	flag.StringVar(&openProgram, "op", "", "Open a specified program when it cannot be found")
 	flag.BoolVar(&printHelp, "help", false, "Print this help message.")
 	flag.BoolVar(&printVer, "v", false, "Print version number.")
 	flag.Parse()
 	configuration.Program = program
 	configuration.Open = open
+	configuration.OpenProgram = openProgram
 }
 
 func main() {
@@ -81,8 +85,12 @@ func main() {
 			attemptFocus(cycle)
 		} else {
 			if configuration.Open {
-				fmt.Println("[Main] Trying to open a new window!")
-				lib.Open(configuration.Program)
+				open := configuration.OpenProgram
+				if open == "" {
+					open = configuration.Program
+				}
+				fmt.Println(fmt.Sprintf("[Main] Trying to open a new window of %s!", open))
+				lib.Open(open)
 			} else {
 				fmt.Println("[Main] No window found, and open config is not set")
 			}
