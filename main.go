@@ -1,17 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"focus/lib"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -24,7 +21,6 @@ type Configuration struct {
 	AvailableWindows  []string
 	CurrentWindowId   string
 	ConfigFolder      string
-	cacheFile         string
 	OpenProgram       string
 }
 
@@ -32,7 +28,6 @@ var configuration Configuration
 var printHelp bool
 var printVer bool
 var start time.Time
-var cacheTtl = time.Second * 300
 var xprop lib.Xprop
 
 func init() {
@@ -43,7 +38,6 @@ func init() {
 	}
 	configuration.ConfigFolder = usr.HomeDir + "/.config/focus/"
 	_ = os.Mkdir(configuration.ConfigFolder, 0700)
-	configuration.cacheFile = configuration.ConfigFolder + "simplecache.json"
 	var program string
 	var open bool
 	var openProgram string
@@ -63,7 +57,6 @@ func main() {
 	if !checkDependencies() || !checkRequiredParams() {
 		os.Exit(0)
 	}
-	preHeatCache()
 	configuration.ProcessId = lib.FindCurrentProcessId(configuration.Program)
 	fmt.Println(fmt.Sprintf("[Main] Current process ID is: %s", configuration.ProcessId))
 
@@ -129,97 +122,42 @@ func attemptFocus(cycle bool) {
 }
 
 func processWindowIds(ids []string, round int) []string {
-	if len(ids) != len(configuration.WindowInformation) {
-		removeCache()
-		ids = xprop.Parse(configuration.StackedWindows)
-		configuration.WindowInformation = xprop.WindowInformation
-		setCache(xprop.WindowInformation)
-	}
-	if round > 2 {
-		removeCache()
-		fmt.Println("ERROR, there were too many rounds something went wrong!")
-		return nil
-	}
+	ids = xprop.Parse(configuration.StackedWindows)
+	configuration.WindowInformation = xprop.WindowInformation
+	fmt.Println(configuration.WindowInformation)
 	var missing []string
 	var availableWindows []string
-	var wg sync.WaitGroup
 	for _, windowId := range ids {
-		wg.Add(1)
-		go func(windowId string) {
-			defer wg.Done()
-			missingWindowId := true
-			for _, info := range configuration.WindowInformation {
-				t := time.Unix(info.Timestamp, 0)
-				if time.Since(t) > cacheTtl {
-					// Stale cache -> process it again
-					continue
+		missingWindowId := true
+		for _, info := range configuration.WindowInformation {
+			if info.WindowId == windowId {
+				// It exists, not sure about being correct yet
+				missingWindowId = false
+				if configuration.ProcessId == info.ProcessId {
+					availableWindows = append(availableWindows, windowId)
+					break
 				}
-				if info.WindowId == windowId {
-					// It exists, not sure about being correct yet
-					missingWindowId = false
-					if configuration.ProcessId == info.ProcessId {
+				for _, name := range info.Names {
+					if strings.Contains(name, configuration.Program) {
 						availableWindows = append(availableWindows, windowId)
 						break
 					}
-					for _, name := range info.Names {
-						if strings.Contains(name, configuration.Program) {
-							availableWindows = append(availableWindows, windowId)
-							break
-						}
-					}
 				}
 			}
-			if missingWindowId {
-				missing = append(missing, windowId)
-			}
-		}(windowId)
+		}
+		if missingWindowId {
+			missing = append(missing, windowId)
+		}
 	}
-	wg.Wait()
 	availableWindows = lib.SliceUniqueMap(availableWindows)
-
 	if len(missing) > 0 {
 		newWindows := xprop.Parse(configuration.StackedWindows)
 		configuration.WindowInformation = xprop.WindowInformation
 		if len(newWindows) > 0 {
-			setCache(xprop.WindowInformation)
 			return processWindowIds(newWindows, round+1)
 		}
 	}
 	return availableWindows
-}
-
-func removeCache() {
-	err := os.Remove(configuration.cacheFile)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	configuration.WindowInformation = nil
-}
-
-func setCache(ids []lib.Information) {
-	fmt.Println("Removing cache!")
-	removeCache()
-	fmt.Println("Setting cache!")
-	config, _ := json.Marshal(ids)
-	err := ioutil.WriteFile(configuration.cacheFile, config, 0644)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-}
-
-func preHeatCache() {
-	file, err := os.Open(configuration.cacheFile)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&configuration.WindowInformation)
-	if err != nil {
-		return
-	}
 }
 
 func checkDependencies() bool {

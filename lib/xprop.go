@@ -3,7 +3,6 @@ package lib
 import (
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -43,35 +42,29 @@ func (xprop *Xprop) Root() {
 }
 
 func (xprop *Xprop) Parse(ids []string) []string {
-	var wg sync.WaitGroup
 	var parsedWindows []string
 	for _, windowId := range ids {
-		wg.Add(1)
-		go func(windowId string, xprop *Xprop) {
-			defer wg.Done()
-			var info Information
-			info.Timestamp = time.Now().Unix()
-			info.WindowId = windowId
-			resp, err := exec.Command("xprop", "-id", windowId).Output()
-			if err != nil {
-				HandleError(err, "[processWindowIds] xprop -id ... command failed")
-				return
+		var info Information
+		info.Timestamp = time.Now().Unix()
+		info.WindowId = windowId
+		resp, err := exec.Command("xprop", "-id", windowId).Output()
+		if err != nil {
+			HandleError(err, "[processWindowIds] xprop -id ... command failed")
+			break
+		}
+		split := strings.Split(string(resp), "\n")
+		for _, str := range split {
+			if strings.Contains(str, "_NET_WM_PID(CARDINAL) = ") {
+				str = strings.Replace(str, "_NET_WM_PID(CARDINAL) = ", "", -1)
+				info.ProcessId = FilterNewLines(str)
 			}
-			split := strings.Split(string(resp), "\n")
-			for _, str := range split {
-				if strings.Contains(str, "_NET_WM_PID(CARDINAL) = ") {
-					str = strings.Replace(str, "_NET_WM_PID(CARDINAL) = ", "", -1)
-					info.ProcessId = FilterNewLines(str)
-				}
-				if strings.Contains(str, "WM_CLASS(STRING) = ") {
-					str = strings.Replace(str, "WM_CLASS(STRING) = ", "", -1)
-					info.Names = CleanNames(FilterNewLines(str))
-				}
+			if strings.Contains(str, "WM_CLASS(STRING) = ") {
+				str = strings.Replace(str, "WM_CLASS(STRING) = ", "", -1)
+				info.Names = CleanNames(FilterNewLines(str))
 			}
-			xprop.WindowInformation = append(xprop.WindowInformation, info)
-			parsedWindows = append(parsedWindows, windowId)
-		}(windowId, xprop)
+		}
+		xprop.WindowInformation = append(xprop.WindowInformation, info)
+		parsedWindows = append(parsedWindows, windowId)
 	}
-	wg.Wait()
 	return parsedWindows
 }
